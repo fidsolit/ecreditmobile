@@ -9,6 +9,26 @@ import {
 } from "react-native";
 import { Input, Button, Text } from "@rneui/themed";
 import { supabase } from "../lib/supabase";
+import { z } from "zod";
+
+// Define Zod schemas for validation
+const signInSchema = z.object({
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+});
+
+const signUpSchema = z
+  .object({
+    email: z.string().email("Invalid email address"),
+    password: z.string().min(6, "Password must be at least 6 characters"),
+    confirmPassword: z
+      .string()
+      .min(6, "Password must be at least 6 characters"),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  });
 
 export default function Auth({ navigation }: { navigation: any }) {
   const [email, setEmail] = useState("");
@@ -20,45 +40,58 @@ export default function Auth({ navigation }: { navigation: any }) {
   const animationValue = useState(new Animated.Value(0))[0]; // Animation state
 
   const handleSignUp = async () => {
-    if (password !== confirmPassword) {
-      Alert.alert("Error", "Passwords do not match!");
-      return;
+    try {
+      // Validate input using Zod
+      signUpSchema.parse({ email, password, confirmPassword });
+
+      setLoading(true);
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+
+      if (error) {
+        Alert.alert("Error", error.message);
+      } else if (data.user) {
+        Alert.alert(
+          "Success",
+          "A confirmation email has been sent to your email address. Please verify your email to complete the signup process."
+        );
+      }
+    } catch (validationError) {
+      if (validationError instanceof z.ZodError) {
+        Alert.alert("Validation Error", validationError.errors[0].message);
+      }
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(true);
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-    });
-
-    if (error) {
-      Alert.alert("Error", error.message);
-    } else if (data.user) {
-      Alert.alert(
-        "Success",
-        "A confirmation email has been sent to your email address. Please verify your email to complete the signup process."
-      );
-    }
-
-    setLoading(false);
   };
 
   const handleSignIn = async () => {
-    setLoading(true);
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      // Validate input using Zod
+      signInSchema.parse({ email, password });
 
-    if (error) {
-      Alert.alert("Error", error.message); // Show error if authentication fails
-    } else if (data.session) {
-      Alert.alert("Success", "Welcome back!");
-      // Navigate to the profile screen (replace with your navigation logic)
-      navigation.navigate("Profile", { userId: data.session.user.id });
+      setLoading(true);
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        Alert.alert("Error", error.message); // Show error if authentication fails
+      } else if (data.session) {
+        Alert.alert("Success", "Welcome back!");
+        // Navigate to the profile screen (replace with your navigation logic)
+        navigation.navigate("Profile", { userId: data.session.user.id });
+      }
+    } catch (validationError) {
+      if (validationError instanceof z.ZodError) {
+        Alert.alert("Validation Error", validationError.errors[0].message);
+      }
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   const handleToggle = () => {
