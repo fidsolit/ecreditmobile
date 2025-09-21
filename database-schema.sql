@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   avatar_url TEXT,
   credit_score INTEGER DEFAULT 0,
   loan_limit DECIMAL(15,2) DEFAULT 0.00,
+  is_admin BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

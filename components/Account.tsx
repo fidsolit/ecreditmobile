@@ -32,6 +32,14 @@ export default function Account({ session }: { session: any }) {
   );
   const [uploading, setUploading] = useState(false);
   const [profileMenuVisible, setProfileMenuVisible] = useState(false);
+  const [loanModalVisible, setLoanModalVisible] = useState(false);
+  const [loanApplication, setLoanApplication] = useState({
+    amount: "",
+    purpose: "",
+    termMonths: "12",
+    monthlyIncome: "",
+    employmentType: "",
+  });
 
   useEffect(() => {
     if (session?.user) {
@@ -205,6 +213,120 @@ export default function Account({ session }: { session: any }) {
     setProfileMenuVisible(false);
   };
 
+  const openLoanApplication = () => {
+    setLoanModalVisible(true);
+    setProfileMenuVisible(false);
+  };
+
+  const closeLoanModal = () => {
+    setLoanModalVisible(false);
+    setLoanApplication({
+      amount: "",
+      purpose: "",
+      termMonths: "12",
+      monthlyIncome: "",
+      employmentType: "",
+    });
+  };
+
+  const calculateLoanDetails = () => {
+    const amount = parseFloat(loanApplication.amount) || 0;
+    const termMonths = parseInt(loanApplication.termMonths) || 12;
+    const interestRate = 0.12; // 12% annual interest rate
+
+    const monthlyRate = interestRate / 12;
+    const monthlyPayment =
+      (amount * monthlyRate * Math.pow(1 + monthlyRate, termMonths)) /
+      (Math.pow(1 + monthlyRate, termMonths) - 1);
+
+    return {
+      monthlyPayment: isNaN(monthlyPayment) ? 0 : monthlyPayment,
+      totalAmount: monthlyPayment * termMonths,
+      interestAmount: monthlyPayment * termMonths - amount,
+    };
+  };
+
+  const submitLoanApplication = async () => {
+    // Validation
+    if (
+      !loanApplication.amount ||
+      !loanApplication.purpose ||
+      !loanApplication.monthlyIncome
+    ) {
+      Alert.alert("Validation Error", "Please fill in all required fields.");
+      return;
+    }
+
+    const amount = parseFloat(loanApplication.amount);
+    const monthlyIncome = parseFloat(loanApplication.monthlyIncome);
+
+    if (amount <= 0 || amount > 500000) {
+      Alert.alert(
+        "Validation Error",
+        "Loan amount must be between ₱1,000 and ₱500,000."
+      );
+      return;
+    }
+
+    if (monthlyIncome <= 0) {
+      Alert.alert("Validation Error", "Monthly income must be greater than 0.");
+      return;
+    }
+
+    // Check if loan amount is reasonable (not more than 5x monthly income)
+    if (amount > monthlyIncome * 5) {
+      Alert.alert(
+        "Validation Error",
+        "Loan amount cannot exceed 5 times your monthly income."
+      );
+      return;
+    }
+
+    try {
+      setUploading(true);
+
+      const loanDetails = calculateLoanDetails();
+      const interestRate = 0.12; // 12% annual
+
+      const { error } = await supabase.from("loans").insert({
+        user_id: session.user.id,
+        amount: amount,
+        interest_rate: interestRate,
+        term_months: parseInt(loanApplication.termMonths),
+        monthly_payment: loanDetails.monthlyPayment,
+        status: "pending",
+        application_date: new Date().toISOString(),
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      // Log activity
+      await supabase.from("activity_log").insert({
+        user_id: session.user.id,
+        activity_type: "loan_application",
+        description: `Applied for ₱${formatCurrency(amount)} loan`,
+        amount: amount,
+      });
+
+      closeLoanModal();
+      Alert.alert(
+        "Application Submitted",
+        "Your loan application has been submitted successfully! We will review it and get back to you within 24 hours.",
+        [{ text: "OK" }]
+      );
+    } catch (error) {
+      console.error("Error submitting loan application:", error);
+      Alert.alert(
+        "Error",
+        "Failed to submit loan application. Please try again."
+      );
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-PH", {
       style: "currency",
@@ -332,7 +454,10 @@ export default function Account({ session }: { session: any }) {
           Quick Actions
         </Text>
 
-        <TouchableOpacity style={styles.actionButton}>
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={openLoanApplication}
+        >
           <Ionicons name="add-circle" size={24} color="#007bff" />
           <Text style={styles.actionText}>Apply for Loan</Text>
           <Ionicons name="chevron-forward" size={20} color="#666" />
@@ -473,6 +598,203 @@ export default function Account({ session }: { session: any }) {
                 containerStyle={styles.inputContainer}
                 inputStyle={styles.disabledInput}
               />
+            </View>
+          </ScrollView>
+        </View>
+      </Modal>
+
+      {/* Loan Application Modal */}
+      <Modal
+        visible={loanModalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={closeLoanModal}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={closeLoanModal}>
+              <Text style={styles.modalCancelButton}>Cancel</Text>
+            </TouchableOpacity>
+            <Text h4 style={styles.modalTitle}>
+              Apply for Loan
+            </Text>
+            <TouchableOpacity
+              onPress={submitLoanApplication}
+              disabled={uploading}
+            >
+              <Text
+                style={[
+                  styles.modalSaveButton,
+                  uploading && styles.disabledButton,
+                ]}
+              >
+                {uploading ? "Submitting..." : "Submit"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView
+            style={styles.modalContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Loan Calculator Preview */}
+            {loanApplication.amount && (
+              <View style={styles.loanPreviewCard}>
+                <Text h4 style={styles.loanPreviewTitle}>
+                  Loan Preview
+                </Text>
+                <View style={styles.loanPreviewRow}>
+                  <Text style={styles.loanPreviewLabel}>Monthly Payment:</Text>
+                  <Text style={[styles.loanPreviewValue, { color: "#007bff" }]}>
+                    {formatCurrency(calculateLoanDetails().monthlyPayment)}
+                  </Text>
+                </View>
+                <View style={styles.loanPreviewRow}>
+                  <Text style={styles.loanPreviewLabel}>Total Amount:</Text>
+                  <Text style={[styles.loanPreviewValue, { color: "#28a745" }]}>
+                    {formatCurrency(calculateLoanDetails().totalAmount)}
+                  </Text>
+                </View>
+                <View style={styles.loanPreviewRow}>
+                  <Text style={styles.loanPreviewLabel}>
+                    Interest (12% APR):
+                  </Text>
+                  <Text style={[styles.loanPreviewValue, { color: "#ff9800" }]}>
+                    {formatCurrency(calculateLoanDetails().interestAmount)}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {/* Loan Application Form */}
+            <View style={styles.formSection}>
+              <Input
+                label="Loan Amount *"
+                value={loanApplication.amount}
+                onChangeText={(text) =>
+                  setLoanApplication((prev) => ({ ...prev, amount: text }))
+                }
+                placeholder="Enter loan amount"
+                keyboardType="numeric"
+                containerStyle={styles.inputContainer}
+                rightIcon={<Text style={styles.currencyLabel}>₱</Text>}
+              />
+
+              <Input
+                label="Loan Purpose *"
+                value={loanApplication.purpose}
+                onChangeText={(text) =>
+                  setLoanApplication((prev) => ({ ...prev, purpose: text }))
+                }
+                placeholder="e.g., Home improvement, Education, Emergency"
+                containerStyle={styles.inputContainer}
+              />
+
+              <View style={styles.dropdownContainer}>
+                <Text style={styles.dropdownLabel}>Repayment Term *</Text>
+                <View style={styles.dropdownOptions}>
+                  {["6", "12", "18", "24", "36"].map((term) => (
+                    <TouchableOpacity
+                      key={term}
+                      style={[
+                        styles.dropdownOption,
+                        loanApplication.termMonths === term &&
+                          styles.dropdownOptionSelected,
+                      ]}
+                      onPress={() =>
+                        setLoanApplication((prev) => ({
+                          ...prev,
+                          termMonths: term,
+                        }))
+                      }
+                    >
+                      <Text
+                        style={[
+                          styles.dropdownOptionText,
+                          loanApplication.termMonths === term &&
+                            styles.dropdownOptionTextSelected,
+                        ]}
+                      >
+                        {term} months
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <Input
+                label="Monthly Income *"
+                value={loanApplication.monthlyIncome}
+                onChangeText={(text) =>
+                  setLoanApplication((prev) => ({
+                    ...prev,
+                    monthlyIncome: text,
+                  }))
+                }
+                placeholder="Enter your monthly income"
+                keyboardType="numeric"
+                containerStyle={styles.inputContainer}
+                rightIcon={<Text style={styles.currencyLabel}>₱</Text>}
+              />
+
+              <View style={styles.dropdownContainer}>
+                <Text style={styles.dropdownLabel}>Employment Type *</Text>
+                <View style={styles.dropdownOptions}>
+                  {[
+                    "Full-time",
+                    "Part-time",
+                    "Self-employed",
+                    "Contract",
+                    "Retired",
+                  ].map((type) => (
+                    <TouchableOpacity
+                      key={type}
+                      style={[
+                        styles.dropdownOption,
+                        loanApplication.employmentType === type &&
+                          styles.dropdownOptionSelected,
+                      ]}
+                      onPress={() =>
+                        setLoanApplication((prev) => ({
+                          ...prev,
+                          employmentType: type,
+                        }))
+                      }
+                    >
+                      <Text
+                        style={[
+                          styles.dropdownOptionText,
+                          loanApplication.employmentType === type &&
+                            styles.dropdownOptionTextSelected,
+                        ]}
+                      >
+                        {type}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.loanTerms}>
+                <Text style={styles.loanTermsTitle}>
+                  Loan Terms & Conditions
+                </Text>
+                <Text style={styles.loanTermsText}>
+                  • Interest Rate: 12% APR (Annual Percentage Rate)
+                </Text>
+                <Text style={styles.loanTermsText}>
+                  • Maximum loan amount: ₱500,000
+                </Text>
+                <Text style={styles.loanTermsText}>
+                  • Processing time: 24-48 hours
+                </Text>
+                <Text style={styles.loanTermsText}>
+                  • No prepayment penalties
+                </Text>
+                <Text style={styles.loanTermsText}>
+                  • Late payment fee: ₱500 per month
+                </Text>
+              </View>
             </View>
           </ScrollView>
         </View>
@@ -805,5 +1127,98 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#212529",
     fontWeight: "500",
+  },
+  // Loan Application Styles
+  loanPreviewCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 20,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  loanPreviewTitle: {
+    color: "#212529",
+    fontWeight: "600",
+    marginBottom: 15,
+    textAlign: "center",
+  },
+  loanPreviewRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  loanPreviewLabel: {
+    fontSize: 14,
+    color: "#6c757d",
+    fontWeight: "500",
+  },
+  loanPreviewValue: {
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  currencyLabel: {
+    fontSize: 16,
+    color: "#6c757d",
+    fontWeight: "600",
+  },
+  dropdownContainer: {
+    marginBottom: 20,
+  },
+  dropdownLabel: {
+    fontSize: 16,
+    color: "#212529",
+    fontWeight: "500",
+    marginBottom: 10,
+  },
+  dropdownOptions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  dropdownOption: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#e9ecef",
+    backgroundColor: "#f8f9fa",
+  },
+  dropdownOptionSelected: {
+    backgroundColor: "#007bff",
+    borderColor: "#007bff",
+  },
+  dropdownOptionText: {
+    fontSize: 14,
+    color: "#6c757d",
+    fontWeight: "500",
+  },
+  dropdownOptionTextSelected: {
+    color: "#ffffff",
+  },
+  loanTerms: {
+    backgroundColor: "#f8f9fa",
+    borderRadius: 8,
+    padding: 15,
+    marginTop: 10,
+  },
+  loanTermsTitle: {
+    fontSize: 16,
+    color: "#212529",
+    fontWeight: "600",
+    marginBottom: 10,
+  },
+  loanTermsText: {
+    fontSize: 12,
+    color: "#6c757d",
+    marginBottom: 4,
+    lineHeight: 16,
   },
 });
