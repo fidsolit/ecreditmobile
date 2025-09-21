@@ -19,13 +19,8 @@ export default function App() {
     // Listen for auth state changes
     const { data: subscription } = supabase.auth.onAuthStateChange(
       (_event, newSession) => {
-        // Only update the session state if it has changed
-        setSession((prevSession) => {
-          if (prevSession?.user?.id !== newSession?.user?.id) {
-            return newSession;
-          }
-          return prevSession;
-        });
+        // Directly set the new session - React will handle the comparison
+        setSession(newSession);
       }
     );
 
