@@ -9,8 +9,28 @@ import {
 } from "react-native";
 import { Input, Button, Text } from "@rneui/themed";
 import { supabase } from "../lib/supabase";
+import { z } from "zod";
 
-export default function Auth() {
+// Define Zod schemas for validation
+const signInSchema = z.object({
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+});
+
+const signUpSchema = z
+  .object({
+    email: z.string().email("Invalid email address"),
+    password: z.string().min(6, "Password must be at least 6 characters"),
+    confirmPassword: z
+      .string()
+      .min(6, "Password must be at least 6 characters"),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  });
+
+export default function Auth({ navigation }: { navigation: any }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -20,18 +40,58 @@ export default function Auth() {
   const animationValue = useState(new Animated.Value(0))[0]; // Animation state
 
   const handleSignUp = async () => {
-    if (password !== confirmPassword) {
-      Alert.alert("Error", "Passwords do not match!");
-      return;
-    }
+    try {
+      // Validate input using Zod
+      signUpSchema.parse({ email, password, confirmPassword });
 
-    setLoading(true);
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-    });
-    if (error) Alert.alert("Error", error.message);
-    setLoading(false);
+      setLoading(true);
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+
+      if (error) {
+        Alert.alert("Error", error.message);
+      } else if (data.user) {
+        Alert.alert(
+          "Success",
+          "A confirmation email has been sent to your email address. Please verify your email to complete the signup process."
+        );
+      }
+    } catch (validationError) {
+      if (validationError instanceof z.ZodError) {
+        Alert.alert("Validation Error", validationError.errors[0].message);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSignIn = async () => {
+    try {
+      // Validate input using Zod
+      signInSchema.parse({ email, password });
+
+      setLoading(true);
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        Alert.alert("Error", error.message); // Show error if authentication fails
+      } else if (data.session) {
+        Alert.alert("Success", "Welcome back!");
+        // Navigate to the profile screen (replace with your navigation logic)
+        navigation.navigate("Profile", { userId: data.session.user.id });
+      }
+    } catch (validationError) {
+      if (validationError instanceof z.ZodError) {
+        Alert.alert("Validation Error", validationError.errors[0].message);
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleToggle = () => {
@@ -89,7 +149,7 @@ export default function Auth() {
               />
               <Button
                 title={loading ? "Signing In..." : "Sign In"}
-                onPress={() => Alert.alert("Sign In Clicked")}
+                onPress={handleSignIn}
                 disabled={loading}
                 buttonStyle={styles.button}
               />
