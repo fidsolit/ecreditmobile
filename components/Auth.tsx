@@ -11,19 +11,36 @@ import { Input, Button, Text } from "@rneui/themed";
 import { supabase } from "../lib/supabase";
 import { z } from "zod";
 
-// Define Zod schemas for validation
+// Zod schemas for input validation
 const signInSchema = z.object({
   email: z.string().email("Invalid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  password: z
+    .string()
+    .min(6, "Password must be at least 6 characters")
+    .regex(
+      /[^A-Za-z0-9]/,
+      "Password must include at least one special character"
+    ),
 });
 
+// Sign-up schema with password confirmation
 const signUpSchema = z
   .object({
     email: z.string().email("Invalid email address"),
-    password: z.string().min(6, "Password must be at least 6 characters"),
+    password: z
+      .string()
+      .min(6, "Password must be at least 6 characters")
+      .regex(
+        /[^A-Za-z0-9]/,
+        "Password must include at least one special character"
+      ),
     confirmPassword: z
       .string()
-      .min(6, "Password must be at least 6 characters"),
+      .min(6, "Password must be at least 6 characters")
+      .regex(
+        /[^A-Za-z0-9]/,
+        "Password must include at least one special character"
+      ),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords do not match",
@@ -82,7 +99,6 @@ export default function Auth({ navigation }: { navigation: any }) {
         Alert.alert("Error", error.message); // Show error if authentication fails
       } else if (data.session) {
         Alert.alert("Success", "Welcome back!");
-        // Navigate to the profile screen (replace with your navigation logic)
         navigation.navigate("Profile", { userId: data.session.user.id });
       }
     } catch (validationError) {
@@ -93,7 +109,6 @@ export default function Auth({ navigation }: { navigation: any }) {
       setLoading(false);
     }
   };
-
   const handleToggle = () => {
     Animated.timing(animationValue, {
       toValue: isSignup ? 0 : 1, // Animate between 0 (Sign In) and 1 (Sign Up)
@@ -115,10 +130,7 @@ export default function Auth({ navigation }: { navigation: any }) {
   });
 
   return (
-    <ImageBackground
-      source={require("../assets/background.jpg")} // Replace with your image path
-      style={styles.background}
-    >
+    <View style={styles.background}>
       <View style={styles.container}>
         {/* Sign In Form */}
         <Animated.View
@@ -132,7 +144,7 @@ export default function Auth({ navigation }: { navigation: any }) {
           {!isSignup && (
             <>
               <Text h3 style={styles.title}>
-                Welcome Back to Angel eCredit
+                Sign in
               </Text>
               <Input
                 placeholder="Email"
@@ -172,7 +184,7 @@ export default function Auth({ navigation }: { navigation: any }) {
           {isSignup && (
             <>
               <Text h3 style={styles.title}>
-                Create Your Angel eCredit Account
+                Create Your AngeliCredit Account
               </Text>
               <Input
                 placeholder="Email"
@@ -207,14 +219,14 @@ export default function Auth({ navigation }: { navigation: any }) {
           )}
         </Animated.View>
       </View>
-    </ImageBackground>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   background: {
     flex: 1,
-    resizeMode: "cover",
+    backgroundColor: "#ffffff", // Plain white background
   },
   container: {
     flex: 1,
@@ -230,16 +242,16 @@ const styles = StyleSheet.create({
   title: {
     textAlign: "center",
     marginBottom: 20,
-    color: "#fff",
+    color: "#ff751f", // title angel gwapa
   },
   button: {
-    backgroundColor: "#007bff",
+    backgroundColor: "#ff751f",
     marginTop: 10,
   },
   footerText: {
     textAlign: "center",
     marginTop: 20,
-    color: "#fff",
+    color: "#000", // Black text for better contrast
   },
   link: {
     color: "#007bff",
