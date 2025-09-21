@@ -196,26 +196,61 @@ export default function AdminDashboard({ session }: { session: any }) {
 
   const loadLoans = async () => {
     try {
-      const { data, error } = await supabase
+      // First, get all loans
+      const { data: loansData, error: loansError } = await supabase
         .from('loans')
-        .select(`
-          *,
-          profiles!inner(email, full_name)
-        `)
+        .select('*')
         .order('application_date', { ascending: false })
         .limit(20);
 
-      if (error) throw error;
+      if (loansError) throw loansError;
 
-      const formattedLoans = data?.map(loan => ({
-        ...loan,
-        user_email: loan.profiles?.email,
-        user_name: loan.profiles?.full_name,
-      })) || [];
+      if (!loansData || loansData.length === 0) {
+        setLoans([]);
+        return;
+      }
+
+      // Get user IDs from loans
+      const userIds = [...new Set(loansData.map(loan => loan.user_id))];
+
+      // Get user profiles for these user IDs
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, email, full_name')
+        .in('id', userIds);
+
+      if (profilesError) {
+        console.error('Error loading profiles:', profilesError);
+        // Continue with loans data even if profiles fail
+        const formattedLoans = loansData.map(loan => ({
+          ...loan,
+          user_email: 'Unknown',
+          user_name: 'Unknown User',
+        }));
+        setLoans(formattedLoans);
+        return;
+      }
+
+      // Create a map of user_id to profile data
+      const profileMap = new Map();
+      profilesData?.forEach(profile => {
+        profileMap.set(profile.id, profile);
+      });
+
+      // Combine loans with profile data
+      const formattedLoans = loansData.map(loan => {
+        const profile = profileMap.get(loan.user_id);
+        return {
+          ...loan,
+          user_email: profile?.email || 'Unknown',
+          user_name: profile?.full_name || 'Unknown User',
+        };
+      });
 
       setLoans(formattedLoans);
     } catch (error) {
       console.error('Error loading loans:', error);
+      setLoans([]);
     }
   };
 
@@ -420,6 +455,7 @@ export default function AdminDashboard({ session }: { session: any }) {
   };
 
   const handleLogout = async () => {
+    console.log('Logout button pressed'); // Debug log
     Alert.alert(
       'Sign Out',
       'Are you sure you want to sign out?',
@@ -433,11 +469,15 @@ export default function AdminDashboard({ session }: { session: any }) {
           style: 'destructive',
           onPress: async () => {
             try {
+              console.log('Starting logout process...'); // Debug log
+              
               // Clear any stored session data
               await AsyncStorage.removeItem('supabase.auth.token');
               
               // Sign out from Supabase
               await supabase.auth.signOut();
+              
+              console.log('Logout successful'); // Debug log
               
               // The App.tsx will automatically redirect to Auth component
               // when session becomes null
@@ -765,13 +805,10 @@ export default function AdminDashboard({ session }: { session: any }) {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text h3 style={styles.headerTitle}>Admin Dashboard</Text>
+        {/* <Text h3 style={styles.headerTitle}>Admin Dashboard</Text> */}
         <View style={styles.headerActions}>
           <TouchableOpacity onPress={onRefresh} style={styles.headerButton}>
             <Ionicons name="refresh" size={24} color="#007bff" />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={handleLogout} style={styles.headerButton}>
-            <Ionicons name="log-out-outline" size={24} color="#dc3545" />
           </TouchableOpacity>
         </View>
       </View>
@@ -1108,6 +1145,20 @@ export default function AdminDashboard({ session }: { session: any }) {
           </View>
         </View>
       )}
+
+      {/* Bottom Logout Button */}
+      <View style={styles.bottomLogoutContainer}>
+        <TouchableOpacity 
+          onPress={handleLogout} 
+          style={styles.bottomLogoutButton}
+          activeOpacity={0.7}
+        >
+          <View style={styles.bottomLogoutContent}>
+            <Ionicons name="log-out-outline" size={24} color="#ffffff" />
+            <Text style={styles.bottomLogoutText}>Sign Out</Text>
+          </View>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -1146,6 +1197,23 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 8,
     backgroundColor: '#f8f9fa',
+  },
+  logoutButton: {
+    backgroundColor: '#fff5f5',
+    borderWidth: 1,
+    borderColor: '#fed7d7',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  logoutButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  logoutButtonText: {
+    color: '#dc3545',
+    fontSize: 14,
+    fontWeight: '600',
   },
   tabContainer: {
     flexDirection: 'row',
@@ -1636,5 +1704,39 @@ const styles = StyleSheet.create({
     color: '#6c757d',
     fontWeight: '500',
     textAlign: 'center',
+  },
+  // Bottom Logout Button Styles
+  bottomLogoutContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    backgroundColor: '#ffffff',
+    borderTopWidth: 1,
+    borderTopColor: '#e9ecef',
+  },
+  bottomLogoutButton: {
+    backgroundColor: '#dc3545',
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  bottomLogoutContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  bottomLogoutText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

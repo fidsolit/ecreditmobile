@@ -232,29 +232,17 @@ export default function Account({ session }: { session: any }) {
   const calculateLoanDetails = () => {
     const amount = parseFloat(loanApplication.amount) || 0;
     const termMonths = parseInt(loanApplication.termMonths) || 1;
-    const monthlyInterestRate = 0.15; // 15% per month (fixed rate)
+    const monthlyInterestRate = 0.15; // 15% per month
 
-    if (amount <= 0) {
-      return {
-        monthlyPayment: 0,
-        totalAmount: 0,
-        interestAmount: 0,
-      };
-    }
-
-    // Calculate interest amount: 15% per month for each month
-    const interestAmount = amount * monthlyInterestRate * termMonths;
-
-    // Calculate total amount
-    const totalAmount = amount + interestAmount;
-
-    // Calculate monthly payment
-    const monthlyPayment = totalAmount / termMonths;
+    // Calculate monthly payment using compound interest formula
+    const monthlyPayment =
+      (amount * monthlyInterestRate * Math.pow(1 + monthlyInterestRate, termMonths)) /
+      (Math.pow(1 + monthlyInterestRate, termMonths) - 1);
 
     return {
       monthlyPayment: isNaN(monthlyPayment) ? 0 : monthlyPayment,
-      totalAmount: totalAmount,
-      interestAmount: interestAmount,
+      totalAmount: monthlyPayment * termMonths,
+      interestAmount: monthlyPayment * termMonths - amount,
     };
   };
 
@@ -272,10 +260,10 @@ export default function Account({ session }: { session: any }) {
     const amount = parseFloat(loanApplication.amount);
     const monthlyIncome = parseFloat(loanApplication.monthlyIncome);
 
-    if (amount < 500 || amount > 500000) {
+    if (amount <= 0 || amount > 500000) {
       Alert.alert(
         "Validation Error",
-        "Loan amount must be between ₱500 and ₱500,000."
+        "Loan amount must be between ₱1,000 and ₱500,000."
       );
       return;
     }
@@ -669,7 +657,7 @@ export default function Account({ session }: { session: any }) {
                 </View>
                 <View style={styles.loanPreviewRow}>
                   <Text style={styles.loanPreviewLabel}>
-                    Interest (Exactly 15% per month):
+                    Interest (15% per month):
                   </Text>
                   <Text style={[styles.loanPreviewValue, { color: "#ff9800" }]}>
                     {formatCurrency(calculateLoanDetails().interestAmount)}
@@ -792,10 +780,10 @@ export default function Account({ session }: { session: any }) {
                   Loan Terms & Conditions
                 </Text>
                 <Text style={styles.loanTermsText}>
-                  • Interest Rate: Exactly 15% per month
+                  • Interest Rate: 15% per month
                 </Text>
                 <Text style={styles.loanTermsText}>
-                  • Loan amount: ₱500 - ₱500,000
+                  • Maximum loan amount: ₱500,000
                 </Text>
                 <Text style={styles.loanTermsText}>
                   • Processing time: 24-48 hours

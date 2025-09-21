@@ -1,0 +1,6 @@
+home / profile
+LOAN
+payment
+transaction
+settings
+contact us
