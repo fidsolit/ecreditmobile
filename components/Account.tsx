@@ -36,7 +36,7 @@ export default function Account({ session }: { session: any }) {
   const [loanApplication, setLoanApplication] = useState({
     amount: "",
     purpose: "",
-    termMonths: "12",
+    termMonths: "1",
     monthlyIncome: "",
     employmentType: "",
   });
@@ -223,7 +223,7 @@ export default function Account({ session }: { session: any }) {
     setLoanApplication({
       amount: "",
       purpose: "",
-      termMonths: "12",
+      termMonths: "1",
       monthlyIncome: "",
       employmentType: "",
     });
@@ -231,13 +231,13 @@ export default function Account({ session }: { session: any }) {
 
   const calculateLoanDetails = () => {
     const amount = parseFloat(loanApplication.amount) || 0;
-    const termMonths = parseInt(loanApplication.termMonths) || 12;
-    const interestRate = 0.12; // 12% annual interest rate
+    const termMonths = parseInt(loanApplication.termMonths) || 1;
+    const monthlyInterestRate = 0.15; // 15% per month
 
-    const monthlyRate = interestRate / 12;
+    // Calculate monthly payment using compound interest formula
     const monthlyPayment =
-      (amount * monthlyRate * Math.pow(1 + monthlyRate, termMonths)) /
-      (Math.pow(1 + monthlyRate, termMonths) - 1);
+      (amount * monthlyInterestRate * Math.pow(1 + monthlyInterestRate, termMonths)) /
+      (Math.pow(1 + monthlyInterestRate, termMonths) - 1);
 
     return {
       monthlyPayment: isNaN(monthlyPayment) ? 0 : monthlyPayment,
@@ -286,7 +286,7 @@ export default function Account({ session }: { session: any }) {
       setUploading(true);
 
       const loanDetails = calculateLoanDetails();
-      const interestRate = 0.12; // 12% annual
+      const interestRate = 0.15; // 15% per month
 
       const { error } = await supabase.from("loans").insert({
         user_id: session.user.id,
@@ -657,7 +657,7 @@ export default function Account({ session }: { session: any }) {
                 </View>
                 <View style={styles.loanPreviewRow}>
                   <Text style={styles.loanPreviewLabel}>
-                    Interest (12% APR):
+                    Interest (15% per month):
                   </Text>
                   <Text style={[styles.loanPreviewValue, { color: "#ff9800" }]}>
                     {formatCurrency(calculateLoanDetails().interestAmount)}
@@ -693,7 +693,7 @@ export default function Account({ session }: { session: any }) {
               <View style={styles.dropdownContainer}>
                 <Text style={styles.dropdownLabel}>Repayment Term *</Text>
                 <View style={styles.dropdownOptions}>
-                  {["6", "12", "18", "24", "36"].map((term) => (
+                  {["1", "2", "3"].map((term) => (
                     <TouchableOpacity
                       key={term}
                       style={[
@@ -715,7 +715,7 @@ export default function Account({ session }: { session: any }) {
                             styles.dropdownOptionTextSelected,
                         ]}
                       >
-                        {term} months
+                        {term} {term === "1" ? "month" : "months"}
                       </Text>
                     </TouchableOpacity>
                   ))}
@@ -780,7 +780,7 @@ export default function Account({ session }: { session: any }) {
                   Loan Terms & Conditions
                 </Text>
                 <Text style={styles.loanTermsText}>
-                  • Interest Rate: 12% APR (Annual Percentage Rate)
+                  • Interest Rate: 15% per month
                 </Text>
                 <Text style={styles.loanTermsText}>
                   • Maximum loan amount: ₱500,000

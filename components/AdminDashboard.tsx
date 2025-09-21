@@ -766,9 +766,14 @@ export default function AdminDashboard({ session }: { session: any }) {
       {/* Header */}
       <View style={styles.header}>
         <Text h3 style={styles.headerTitle}>Admin Dashboard</Text>
-        <TouchableOpacity onPress={onRefresh}>
-          <Ionicons name="refresh" size={24} color="#007bff" />
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity onPress={onRefresh} style={styles.headerButton}>
+            <Ionicons name="refresh" size={24} color="#007bff" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleLogout} style={styles.headerButton}>
+            <Ionicons name="log-out-outline" size={24} color="#dc3545" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Tabs */}
@@ -1131,6 +1136,16 @@ const styles = StyleSheet.create({
   headerTitle: {
     color: '#212529',
     fontWeight: '600',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 15,
+  },
+  headerButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#f8f9fa',
   },
   tabContainer: {
     flexDirection: 'row',
