@@ -10,7 +10,7 @@ import {
 import { Input, Button, Text } from "@rneui/themed";
 import { supabase } from "../lib/supabase";
 
-export default function Auth() {
+export default function Auth({ navigation }: { navigation: any }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -26,11 +26,38 @@ export default function Auth() {
     }
 
     setLoading(true);
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
     });
-    if (error) Alert.alert("Error", error.message);
+
+    if (error) {
+      Alert.alert("Error", error.message);
+    } else if (data.user) {
+      Alert.alert(
+        "Success",
+        "A confirmation email has been sent to your email address. Please verify your email to complete the signup process."
+      );
+    }
+
+    setLoading(false);
+  };
+
+  const handleSignIn = async () => {
+    setLoading(true);
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      Alert.alert("Error", error.message); // Show error if authentication fails
+    } else if (data.session) {
+      Alert.alert("Success", "Welcome back!");
+      // Navigate to the profile screen (replace with your navigation logic)
+      navigation.navigate("Profile", { userId: data.session.user.id });
+    }
+
     setLoading(false);
   };
 
@@ -89,7 +116,7 @@ export default function Auth() {
               />
               <Button
                 title={loading ? "Signing In..." : "Sign In"}
-                onPress={() => Alert.alert("Sign In Clicked")}
+                onPress={handleSignIn}
                 disabled={loading}
                 buttonStyle={styles.button}
               />
